@@ -28,6 +28,7 @@ export default function GridUrbanAdvanced({
   const [region, setRegion] = useState([]); // [{x,y}, ...]
   const [regionActive, setRegionActive] = useState(false);
   const [lastRegionCell, setLastRegionCell] = useState(null);
+  const [muted, setMuted] = useState(false);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -63,7 +64,7 @@ export default function GridUrbanAdvanced({
     const Ctx = window.AudioContext || window.webkitAudioContext;
     audioCtxRef.current = new Ctx();
     masterGainRef.current = audioCtxRef.current.createGain();
-    masterGainRef.current.gain.value = 1;
+    masterGainRef.current.gain.value = muted ? 0 : 1;
     masterGainRef.current.connect(audioCtxRef.current.destination);
 
     // // load persisted library metadata
@@ -129,6 +130,10 @@ export default function GridUrbanAdvanced({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (masterGainRef.current) masterGainRef.current.gain.value = muted ? 0 : 1;
+  }, [muted]);
 
   // whenever placements change, persist them (without nodes)
   useEffect(() => {
@@ -420,7 +425,22 @@ export default function GridUrbanAdvanced({
     function onKeyDown(e) {
       const key = e.key;
 
-      // top-level: add file picker (1), etc. (you can wire UI) - omitted for brevity
+      // Top menu shortcuts
+      if (key === "1") {
+        e.preventDefault();
+        openAddRecordingDialog();
+        return;
+      }
+      if (key === "2") {
+        e.preventDefault();
+        setMuted(m => !m);
+        return;
+      }
+    //   if (key === "3") {
+    //     e.preventDefault();
+    //     setBlackout(b => !b);
+    //     return;
+    //   }
 
       // If region active and arrow + shift: expand/trim region
     //   if (e.shiftKey && isArrowKey(key)) {
@@ -661,16 +681,6 @@ export default function GridUrbanAdvanced({
 
   return (
     <div className="p-4 font-sans">
-      {/* <div className="flex items-center gap-4 mb-4">
-        <div className="text-sm font-medium">Soundscape — Grid</div>
-        <div className="flex gap-3">
-          <label className="px-3 py-1 rounded border cursor-pointer">
-            Add recording
-            <input id="file-input" type="file" accept="audio/*" onChange={handleFileInputChange} className="hidden" />
-          </label>
-        </div>
-        <div className="ml-auto text-xs text-gray-500">Use Arrow keys (or WASD) to move. Hold Shift + Arrow to select a path. Type alphanumeric to choose recording. Enter to place.</div>
-      </div> */}
       <div className="flex items-center gap-4 mb-4">
         <div className="text-sm font-medium">Top Menu (keyboard shortcuts)</div>
         <div className="flex gap-3">
@@ -678,8 +688,8 @@ export default function GridUrbanAdvanced({
             1 — Add recording
             <input id="file-input" type="file" accept="audio/*" onChange={onFileInputChange} className="hidden" />
           </label>
-          {/* <button className="px-3 py-1 rounded border" onClick={() => setMuted(m => !m)}>2 — Toggle mute ({muted ? 'Muted' : 'Unmuted'})</button>
-          <button className="px-3 py-1 rounded border" onClick={() => setBlackout(b => !b)}>3 — Toggle blackout ({blackout ? 'On' : 'Off'})</button> */}
+          <button className="px-3 py-1 rounded border" onClick={() => setMuted(m => !m)}>2 — Toggle mute ({muted ? 'Muted' : 'Unmuted'})</button>
+          {/* <button className="px-3 py-1 rounded border" onClick={() => setBlackout(b => !b)}>3 — Toggle blackout ({blackout ? 'On' : 'Off'})</button> */}
         </div>
         <div className="ml-auto text-xs text-gray-500">Arrows/WASD move. Alphanumeric opens library search. Enter places. Backspace/Delete removes. 'e' edits.</div>
       </div>
