@@ -20,8 +20,8 @@ import NavigationPad from "./NavigationPad";
  */
 
 export default function GridUrbanAdvanced({
-  cols = 8,
-  rows = 8,
+  cols = 15,
+  rows = 15,
   defaultRadius = 3,
 }) {
   // UI state
