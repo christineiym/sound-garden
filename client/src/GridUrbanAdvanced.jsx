@@ -1,5 +1,6 @@
 // SoundscapePrototypeFinal.jsx
 import React, { useEffect, useRef, useState } from "react";
+import NavigationPad from "./NavigationPad";
 
 /**
  * SoundscapePrototypeFinal
@@ -36,6 +37,10 @@ export default function GridUrbanAdvanced({
 
   const [library, setLibrary] = useState([]); // {id,name,src,type,buffer?}
   const [placements, setPlacements] = useState([]); // { id, cells:[{x,y}], libId, params }
+
+  // navigation
+  const [shiftLocked, setShiftLocked] = useState(false);
+  const [pressedKey, setPressedKey] = useState(null); // for animating NavigationPad
 
   // audio
   const audioCtxRef = useRef(null);
@@ -249,20 +254,6 @@ export default function GridUrbanAdvanced({
     reader.readAsDataURL(file);
   }
 
-  // region selection movement helper: add/trim path
-  function handleRegionMovement(next) {
-    const curRegion = regionRef.current.slice(); // copy
-    const existingIdx = curRegion.findIndex((c) => c.x === next.x && c.y === next.y);
-    if (existingIdx >= 0) {
-      // backtrack => trim to that index
-      const trimmed = curRegion.slice(0, existingIdx + 1);
-      setRegion(trimmed);
-    } else {
-      setRegion([...curRegion, { x: next.x, y: next.y }]);
-    }
-    setLastRegionCell({ x: next.x, y: next.y });
-  }
-
   function handleRegionMovementWithShift(curCursor, key, region, setRegion, lastCell, setLastCell) {
     const next = computeNextFromKey(curCursor, key);
     // If this is the first Shift+Arrow press, include the current cursor as the anchor
@@ -422,6 +413,8 @@ export default function GridUrbanAdvanced({
 
   // global key handling for navigation, region selection, placing, deleting, editing
   useEffect(() => {
+    console.log("in effect", shiftLocked, pressedKey);
+
     function onKeyDown(e) {
       const key = e.key;
 
@@ -441,26 +434,19 @@ export default function GridUrbanAdvanced({
     //     setBlackout(b => !b);
     //     return;
     //   }
+      if (e.shiftKey) setShiftLocked(true);
 
-      // If region active and arrow + shift: expand/trim region
-    //   if (e.shiftKey && isArrowKey(key)) {
-    //     e.preventDefault();
-    //     // ensure cursor exists
-    //     const cur = cursorRef.current || { x: Math.floor(cols / 2), y: 0 };
-    //     const next = computeNextFromKey(cur, key);
-    //     setCursor(next);
-    //     handleRegionMovement(next);
-    //     setRegionActive(true);
-    //     return;
-    //   }
         // TODO: just shift;
-      if (e.shiftKey && isArrowKey(key)) {
+      if (e.shiftKey && (isArrowKey(key) || ["w", "a", "s", "d"].includes(key))) {
         e.preventDefault();
         // ensure cursor exists
         const cur = cursorRef.current || { x: Math.floor(cols / 2), y: 0 };
         const next = handleRegionMovementWithShift(cur, key, regionRef.current, setRegion, lastRegionCell, setLastRegionCell);
         setCursor(next);
         setRegionActive(true);
+        // set animations
+        setShiftLocked(true);
+        setPressedKey(e.key.toLowerCase());
         return;
       }
 
@@ -487,6 +473,9 @@ export default function GridUrbanAdvanced({
           const placement = placementsRef.current.find((p) => p.id === id);
           if (placement) updatePlacementGainAndPan(placement, nd, next);
         });
+        // set animations
+        setShiftLocked(false);
+        setPressedKey(e.key.toLowerCase());
         return;
       }
 
@@ -537,12 +526,29 @@ export default function GridUrbanAdvanced({
         setSearchOpen(false);
         setRegion([]);
         setRegionActive(false);
+        setPressedKey(key.toLowerCase());
       }
     }
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [regionActive, cols, rows]);
+    function onKeyUp(e) {
+      if (e.key === 'Shift') setShiftLocked(false);
+      if (["Escape", "ArrowUp","ArrowDown","ArrowLeft","ArrowRight","w","a","s","d","W","A","S","D"].includes(e.key)) {
+        setPressedKey(null); // resets on-screen key animations on release
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, [regionActive, cols, rows, shiftLocked, pressedKey]);
+
+  useEffect(() => {
+    console.log(shiftLocked);
+    console.log(pressedKey);
+  }, [shiftLocked, pressedKey]);
 
   // handle search navigation/selection keys while dropdown is open
   useEffect(() => {
@@ -581,6 +587,15 @@ export default function GridUrbanAdvanced({
     window.addEventListener("keydown", onSearchKey);
     return () => window.removeEventListener("keydown", onSearchKey);
   }, [searchOpen, searchHighlightIdx, regionActive, defaultRadius]);
+
+    // When cursor is set (including via keyboard), update gains for running placements
+  useEffect(() => {
+    if (!cursor) return;
+    Object.entries(nodesRef.current).forEach(([id, nd]) => {
+      const placement = placementsRef.current.find((p) => p.id === id);
+      if (placement) updatePlacementGainAndPan(placement, nd, cursor);
+    });
+  }, [cursor]);
 
   // Compute filtered library based on searchQuery
   function filteredLibrary() {
@@ -668,14 +683,73 @@ export default function GridUrbanAdvanced({
     }
   }
 
-  // When cursor is set (including via keyboard), update gains for running placements
-  useEffect(() => {
-    if (!cursor) return;
-    Object.entries(nodesRef.current).forEach(([id, nd]) => {
-      const placement = placementsRef.current.find((p) => p.id === id);
-      if (placement) updatePlacementGainAndPan(placement, nd, cursor);
-    });
-  }, [cursor]);
+  // UI movement
+  function handleMoveFromUI(dir) {
+    const key = dirToKey(dir); // e.g. up→ArrowUp
+    // reflect the pressed key for the on-screen animation (lowercase like 'arrowup')
+    setPressedKey(key.toLowerCase());
+
+    // Escape to clear search/region
+    if (key === "Escape") {
+      setSearchOpen(false);
+      setRegion([]);
+      setRegionActive(false);
+      // clear pressedKey after short animation
+      setTimeout(() => setPressedKey(null), 150);
+      return;
+    }
+
+    // If Shift-lock is enabled, perform region movement logic
+    if (shiftLocked && (isArrowKey(key) || ["w", "a", "s", "d"].includes(key))) {
+      const cur = cursorRef.current || { x: Math.floor(cols / 2), y: 0 };
+      const next = handleRegionMovementWithShift(cur, key, regionRef.current, setRegion, lastRegionCell, setLastRegionCell);
+      setCursor(next);
+      setRegionActive(true);
+      // ensure animations reflect shift-lock
+      setShiftLocked(true);
+      // clear pressedKey after short animation
+      setTimeout(() => setPressedKey(null), 150);
+      return;
+    }
+
+    // Regular movement
+    if (isArrowKey(key) || ["w", "a", "s", "d"].includes(key)) {
+      const cur = cursorRef.current || { x: Math.floor(cols / 2), y: 0 };
+      // map WASD -> Arrow* if needed
+      let realKey = key;
+      if (key === "w") realKey = "ArrowUp";
+      if (key === "s") realKey = "ArrowDown";
+      if (key === "a") realKey = "ArrowLeft";
+      if (key === "d") realKey = "ArrowRight";
+      const next = computeNextFromKey(cur, realKey);
+      setCursor(next);
+      // if moving without shift, cancel region selection
+      if (regionActive) {
+        setRegionActive(false);
+        setRegion([]);
+        setLastRegionCell(null);
+      }
+      // update gains for running placements
+      Object.entries(nodesRef.current).forEach(([id, nd]) => {
+        const placement = placementsRef.current.find((p) => p.id === id);
+        if (placement) updatePlacementGainAndPan(placement, nd, next);
+      });
+      // reflect UI animation then clear
+      setShiftLocked(false);
+      setTimeout(() => setPressedKey(null), 150);
+      return;
+    }
+  }
+
+  function dirToKey(dir) {
+    return {
+      up: 'ArrowUp',
+      down: 'ArrowDown',
+      left: 'ArrowLeft',
+      right: 'ArrowRight',
+      escape: 'Escape'
+    } [dir];
+  }
 
   // JSX -----------------------------------------------------------
 
@@ -695,21 +769,25 @@ export default function GridUrbanAdvanced({
       </div>
 
       <div className="relative">
-        {/* Grid container with CSS grid so region outlines can use gridColumn/gridRow */}
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 48px)` }} className="relative">
-          {Array.from({ length: rows }).flatMap((_, y) =>
-            Array.from({ length: cols }).map((_, x) => renderCell(x, y))
-          )}
-          {/* overlays go after cells so they appear on top */}
-          <div style={{ gridColumn: `1 / ${cols + 1}`, gridRow: `1 / ${rows + 1}`, position: "absolute", inset: 0, pointerEvents: "none" }}>
-            <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 48px)` }}>
-              {regionActive && region.map((c) => (
-                // <div key={`outline-${c.x}-${c.y}`} style={{ gridColumn: c.x + 1, gridRow: c.y + 1, width: 48, height: 48, boxSizing: "border-box", border: "2px solid rgba(60,130,255,0.9)", borderRadius: 4, pointerEvents: "none", animation: "pulse 1s infinite" }} />
-                <div key={`outline-${c.x}-${c.y}`} style={{ gridColumn: c.x + 1, gridRow: c.y + 1, width: 48, height: 48, boxSizing: "border-box"}} />
-                // TODO: check
-              ))}
+        <div className="flex gap-3">
+          {/* Grid container with CSS grid so region outlines can use gridColumn/gridRow */}
+          <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 48px)` }} className="relative">
+            {Array.from({ length: rows }).flatMap((_, y) =>
+              Array.from({ length: cols }).map((_, x) => renderCell(x, y))
+            )}
+            {/* overlays go after cells so they appear on top */}
+            <div style={{ gridColumn: `1 / ${cols + 1}`, gridRow: `1 / ${rows + 1}`, position: "absolute", inset: 0, pointerEvents: "none" }}>
+              <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 48px)` }}>
+                {regionActive && region.map((c) => (
+                  // <div key={`outline-${c.x}-${c.y}`} style={{ gridColumn: c.x + 1, gridRow: c.y + 1, width: 48, height: 48, boxSizing: "border-box", border: "2px solid rgba(60,130,255,0.9)", borderRadius: 4, pointerEvents: "none", animation: "pulse 1s infinite" }} />
+                  <div key={`outline-${c.x}-${c.y}`} style={{ gridColumn: c.x + 1, gridRow: c.y + 1, width: 48, height: 48, boxSizing: "border-box"}} />
+                  // TODO: check
+                ))}
+              </div>
             </div>
           </div>
+          {/* On-screen keyboard */}
+          <NavigationPad onMove={(dir) => handleMoveFromUI(dir)} shiftLocked={shiftLocked} setShiftLocked={setShiftLocked} pressedKey={pressedKey} />
         </div>
       </div>
 
