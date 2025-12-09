@@ -20,8 +20,8 @@ import NavigationPad from "./NavigationPad";
  */
 
 export default function GridUrbanAdvanced({
-  cols = 15,
-  rows = 15,
+  cols = 10,
+  rows = 10,
   defaultRadius = 3,
 }) {
   // UI state
@@ -755,21 +755,21 @@ export default function GridUrbanAdvanced({
 
   return (
     <div className="p-4 font-sans">
-      <div className="flex items-center gap-4 mb-4">
-        <div className="text-sm font-medium">Top Menu (keyboard shortcuts)</div>
+      <div className="flex flex-col md:flex-row items-center gap-4 mb-4">
+        <div className="text-sm font-medium text-gray-500">Top Menu (keyboard shortcuts)</div>
         <div className="flex gap-3">
-          <label className="px-3 py-1 rounded border cursor-pointer">
+          <button className="px-3 py-1 rounded border">
             1 — Add recording
             <input id="file-input" type="file" accept="audio/*" onChange={onFileInputChange} className="hidden" />
-          </label>
+          </button>
           <button className="px-3 py-1 rounded border" onClick={() => setMuted(m => !m)}>2 — Toggle mute ({muted ? 'Muted' : 'Unmuted'})</button>
           {/* <button className="px-3 py-1 rounded border" onClick={() => setBlackout(b => !b)}>3 — Toggle blackout ({blackout ? 'On' : 'Off'})</button> */}
         </div>
         <div className="ml-auto text-xs text-gray-500">Arrows/WASD move. Alphanumeric opens library search. Enter places. Backspace/Delete removes. 'e' edits.</div>
       </div>
 
-      <div className="relative">
-        <div className="flex gap-3">
+      <div className="relative items-center justify-center">
+        <div className="flex flex-col md:flex-row gap-3">
           {/* Grid container with CSS grid so region outlines can use gridColumn/gridRow */}
           <div style={{ display: "grid", gridTemplateColumns: `repeat(${cols}, 48px)` }} className="relative">
             {Array.from({ length: rows }).flatMap((_, y) =>
@@ -792,14 +792,14 @@ export default function GridUrbanAdvanced({
       </div>
 
       {/* Library & Placements panel */}
-      <div className="mt-4 flex gap-6">
+      <div className="mt-4 flex flex-col md:flex-row gap-6">
         <div className="w-80">
           <div className="text-sm font-semibold mb-2">Library</div>
           <ul className="max-h-48 overflow-auto border rounded p-2 text-sm">
             {library.length === 0 && <li className="text-gray-500">No recordings yet — upload or place files in public/recordings with manifest.json</li>}
             {library.map((item) => (
               <li key={item.id} className="py-1 flex justify-between items-center">
-                <div className="truncate">{item.name}</div>
+                <div className="truncate text-gray-500 dark:text-white">{item.name}</div>
                 <div className="flex gap-2">
                   <button className="px-2 py-0.5 border rounded text-xs" onClick={() => handlePlaceFromList(item)}>Place</button>
                   <button className="px-2 py-0.5 border rounded text-xs" onClick={() => {

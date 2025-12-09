@@ -46,9 +46,9 @@ export default function LeftDrawer({ links }) {
         onClick={() => setOpen(true)}
       >
         <div className="space-y-1">
-          <span className="block h-0.5 w-6 bg-white" />
-          <span className="block h-0.5 w-6 bg-white" />
-          <span className="block h-0.5 w-6 bg-white" />
+          <span className="block h-0.5 w-6 bg-black dark:bg-white" />
+          <span className="block h-0.5 w-6 bg-black dark:bg-white" />
+          <span className="block h-0.5 w-6 bg-black dark:bg-white" />
         </div>
       </button>
 
